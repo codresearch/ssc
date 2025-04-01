@@ -1,3 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Result Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        .result-table th, .result-table td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .result-table th {
+            background-color: #f2f2f2;
+        }
+        .error {
+            color: red;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .total-row {
+            background-color: #f9f9f9;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Exam Result Analyzer</h1>
+    <input type="text" id="urlInput" placeholder="Enter the exam result URL">
+    <button onclick="analyzeResults()">Analyze Result</button>
+
+    <div id="error" class="error"></div>
+
+    <div id="results" style="display:none;">
+        <h2>Candidate Details</h2>
+        <table class="result-table" id="candidateDetails"></table>
+        
+        <h2>Subject-Wise Results</h2>
+        <table class="result-table" id="subjectResults"></table>
+    </div>
+</div>
+
 <script>
     async function analyzeResults() {
         const url = document.getElementById('urlInput').value;
@@ -40,25 +127,24 @@
             }
             candidateDetailsTable.innerHTML = candidateDetailsHTML;
 
-            // Define total number of questions for each section (All have 25)
+            // Define total number of questions for each section (subject)
             const totalQuestions = {
-                'General Intelligence and Reasoning': 25,
-                'General Awareness': 25,
-                'Quantitative Aptitude': 25,
-                'English': 25
+                'General Intelligence and Reasoning': 50, // Example, adjust based on actual data
+                'General Awareness': 40, // Example, adjust based on actual data
+                'Quantitative Aptitude': 50, // Example, adjust based on actual data
+                'English': 30 // Example, adjust based on actual data
             };
 
             // Display subject-wise results
             const sections = data['Results']['Sections'];
             let subjectResultsHTML = '<tr><th>Subject</th><th>Attempted</th><th>Not Attempted</th><th>Correct</th><th>Wrong</th><th>Marks</th></tr>';
             let totalAttempted = 0;
-            let totalNotAttempted = 0;
             let totalCorrect = 0;
             let totalWrong = 0;
             let totalMarks = 0;
 
             for (const [subject, stats] of Object.entries(sections)) {
-                // Corrected Not Attempted Calculation (25 - Attempted)
+                // Calculate Not Attempted for each subject
                 const notAttempted = totalQuestions[subject] - stats.Attempted;
 
                 subjectResultsHTML += `
@@ -73,7 +159,6 @@
                 `;
                 
                 totalAttempted += stats.Attempted;
-                totalNotAttempted += notAttempted;
                 totalCorrect += stats.Correct;
                 totalWrong += stats.Wrong;
                 totalMarks += stats.Marks;
@@ -84,7 +169,7 @@
                 <tr class="total-row">
                     <td>Total</td>
                     <td>${totalAttempted}</td>
-                    <td>${totalNotAttempted}</td>
+                    <td>${totalQuestions['General Intelligence and Reasoning'] - totalAttempted}</td> <!-- Assuming 100 total questions -->
                     <td>${totalCorrect}</td>
                     <td>${totalWrong}</td>
                     <td>${totalMarks.toFixed(2)}</td>
@@ -98,3 +183,6 @@
         }
     }
 </script>
+
+</body>
+</html>
