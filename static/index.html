@@ -129,10 +129,10 @@
 
             // Define total number of questions for each section (subject)
             const totalQuestions = {
-                'General Intelligence and Reasoning': 25, // Example, adjust based on actual data
-                'General Awareness': 25, // Example, adjust based on actual data
-                'Quantitative Aptitude': 25, // Example, adjust based on actual data
-                'English': 25 // Example, adjust based on actual data
+                'General Intelligence and Reasoning': 50, // Example, adjust based on actual data
+                'General Awareness': 40, // Example, adjust based on actual data
+                'Quantitative Aptitude': 50, // Example, adjust based on actual data
+                'English': 30 // Example, adjust based on actual data
             };
 
             // Display subject-wise results
@@ -169,7 +169,7 @@
                 <tr class="total-row">
                     <td>Total</td>
                     <td>${totalAttempted}</td>
-                    <td>${100- totalAttempted}</td> <!-- Assuming 100 total questions -->
+                    <td>${totalQuestions['General Intelligence and Reasoning'] - totalAttempted}</td> <!-- Assuming 100 total questions -->
                     <td>${totalCorrect}</td>
                     <td>${totalWrong}</td>
                     <td>${totalMarks.toFixed(2)}</td>
