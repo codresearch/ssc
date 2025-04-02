@@ -20,7 +20,7 @@ chrome_options.add_argument("--disable-dev-shm-usage")
 @app.route('/analyze', methods=['POST'])
 def analyze_exam_result():
     try:
-        # Get the URL from the request
+        # Get URL from request
         data = request.get_json()
         url = data.get('url')
 
@@ -31,12 +31,11 @@ def analyze_exam_result():
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         driver.get(url)
         html_content = driver.page_source
-        driver.quit()  # Close the driver after fetching the page
+        driver.quit()  # Close browser after fetching page
 
         # Parse HTML with BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Initialize data structure
         result_data = {
             "Candidate Details": {}, 
             "Results": {
@@ -51,7 +50,7 @@ def analyze_exam_result():
             }
         }
 
-        # Extract candidate details
+        # Extract candidate details safely
         candidate_table = soup.find('table')
         if candidate_table:
             for row in candidate_table.find_all('tr'):
@@ -69,7 +68,7 @@ def analyze_exam_result():
             {"name": "English", "range": (76, 100)}
         ]
 
-        # Initialize section-wise results
+        # Initialize section results
         for section in sections:
             result_data["Results"]["Sections"][section["name"]] = {
                 "Correct": 0,
@@ -78,7 +77,7 @@ def analyze_exam_result():
                 "Marks": 0
             }
 
-        # Process questions
+        # Process each question panel
         question_panels = soup.find_all('div', class_='question-pnl')
 
         for i, panel in enumerate(question_panels, 1):
@@ -86,36 +85,34 @@ def analyze_exam_result():
             if not current_section:
                 continue
 
+            # Get question status safely
             status_table = panel.find('table', class_='menu-tbl')
             if not status_table:
                 continue
 
             status_td = status_table.find('td', text='Status :')
-            if status_td:
-                status_element = status_td.find_next_sibling('td')
-                status = status_element.text.strip() if status_element else "Unknown"
-            else:
-                status = "Unknown"
+            status = status_td.find_next_sibling('td').get_text(strip=True) if status_td else "Unknown"
 
             if status == 'Answered':
                 chosen_option_td = status_table.find('td', text='Chosen Option :')
-                if not chosen_option_td:
-                    continue
+                chosen_option = (
+                    chosen_option_td.find_next_sibling('td').get_text(strip=True)
+                    if chosen_option_td and chosen_option_td.find_next_sibling('td')
+                    else None
+                )
 
-                chosen_option_element = chosen_option_td.find_next_sibling('td')
-                chosen_option = chosen_option_element.text.strip() if chosen_option_element else None
-
-                options = panel.find_all('td', class_=['rightAns', 'wrngAns'])
-                for option in options:
-                    option_text = option.get_text(strip=True)
-                    if chosen_option and option_text.startswith(f"{chosen_option}."):
-                        if 'rightAns' in option.get('class', []):
-                            result_data["Results"]["Total"]["Correct"] += 1
-                            result_data["Results"]["Sections"][current_section]["Correct"] += 1
-                        else:
-                            result_data["Results"]["Total"]["Wrong"] += 1
-                            result_data["Results"]["Sections"][current_section]["Wrong"] += 1
-                        break
+                if chosen_option:
+                    options = panel.find_all('td', class_=['rightAns', 'wrngAns'])
+                    for option in options:
+                        option_text = option.get_text(strip=True)
+                        if option_text.startswith(f"{chosen_option}."):
+                            if 'rightAns' in option.get('class', []):
+                                result_data["Results"]["Total"]["Correct"] += 1
+                                result_data["Results"]["Sections"][current_section]["Correct"] += 1
+                            else:
+                                result_data["Results"]["Total"]["Wrong"] += 1
+                                result_data["Results"]["Sections"][current_section]["Wrong"] += 1
+                            break
 
         # Calculate marks
         for section in sections:
@@ -131,6 +128,8 @@ def analyze_exam_result():
 
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"Network error: {str(e)}"}), 500
+    except AttributeError as e:
+        return jsonify({"error": f"HTML Parsing error: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Processing error: {str(e)}"}), 500
 
