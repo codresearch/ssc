@@ -2,30 +2,59 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
+
+# Function to fetch page source using Selenium
+def fetch_page_with_selenium(url):
+    options = Options()
+    options.add_argument("--headless")  # Run in headless mode
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    driver.get(url)
+    
+    html_content = driver.page_source
+    driver.quit()
+    return html_content
 
 # API endpoint to analyze exam results
 @app.route('/analyze', methods=['POST'])
 def analyze_exam_result():
     try:
-        # Get the URL from the POST request
+        # Get URL from the request
         data = request.get_json()
         url = data.get('url')
         
         if not url:
             return jsonify({"error": "URL is required"}), 400
         
-        # Fetch the page content
-        response = requests.get(url)
-        response.raise_for_status()
-        html_content = response.text
+        # Use Requests with headers and session
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        # Try to fetch content normally
+        response = session.get(url)
+        
+        if response.status_code == 403:  # Forbidden
+            print("403 Forbidden - Using Selenium instead")
+            html_content = fetch_page_with_selenium(url)
+        else:
+            html_content = response.text
         
         # Parse HTML content
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Initialize result data structure
+        # Initialize result data
         result_data = {
             "Candidate Details": {}, 
             "Results": {
@@ -50,7 +79,7 @@ def analyze_exam_result():
                     value = cells[1].get_text(strip=True)
                     result_data["Candidate Details"][key] = value
         
-        # Exam sections configuration
+        # Define exam sections
         sections = [
             {"name": "General Intelligence and Reasoning", "range": (1, 25)},
             {"name": "General Awareness", "range": (26, 50)},
@@ -58,7 +87,7 @@ def analyze_exam_result():
             {"name": "English", "range": (76, 100)}
         ]
         
-        # Initialize section-wise results
+        # Initialize sections
         for section in sections:
             result_data["Results"]["Sections"][section["name"]] = {
                 "Correct": 0,
