@@ -104,7 +104,7 @@
         }
 
         try {
-            const response = await fetch('http://127.0.0.1:5000/analyze', {
+            const response = await fetch('https://ssc-5a4c.onrender.com/analyze', { // ✅ Correct API URL
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -129,10 +129,10 @@
 
             // Define total number of questions for each section (subject)
             const totalQuestions = {
-                'General Intelligence and Reasoning': 25, // Example, adjust based on actual data
-                'General Awareness': 25, // Example, adjust based on actual data
-                'Quantitative Aptitude': 25, // Example, adjust based on actual data
-                'English': 25 // Example, adjust based on actual data
+                'General Intelligence and Reasoning': 25, 
+                'General Awareness': 25, 
+                'Quantitative Aptitude': 25, 
+                'English': 25 
             };
 
             // Display subject-wise results
@@ -144,7 +144,6 @@
             let totalMarks = 0;
 
             for (const [subject, stats] of Object.entries(sections)) {
-                // Calculate Not Attempted for each subject
                 const notAttempted = totalQuestions[subject] - stats.Attempted;
 
                 subjectResultsHTML += `
@@ -157,19 +156,18 @@
                         <td>${stats.Marks.toFixed(2)}</td>
                     </tr>
                 `;
-                
+
                 totalAttempted += stats.Attempted;
                 totalCorrect += stats.Correct;
                 totalWrong += stats.Wrong;
                 totalMarks += stats.Marks;
             }
 
-            // Add total row at the bottom of the table
             subjectResultsHTML += `
                 <tr class="total-row">
                     <td>Total</td>
                     <td>${totalAttempted}</td>
-                    <td>${100- totalAttempted}</td> <!-- Assuming 100 total questions -->
+                    <td>${100 - totalAttempted}</td> 
                     <td>${totalCorrect}</td>
                     <td>${totalWrong}</td>
                     <td>${totalMarks.toFixed(2)}</td>
