@@ -3,58 +3,40 @@ from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-# Function to fetch page source using Selenium
-def fetch_page_with_selenium(url):
-    options = Options()
-    options.add_argument("--headless")  # Run in headless mode
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
-    driver.get(url)
-    
-    html_content = driver.page_source
-    driver.quit()
-    return html_content
+# Selenium setup
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Run in headless mode
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
 
 # API endpoint to analyze exam results
 @app.route('/analyze', methods=['POST'])
 def analyze_exam_result():
     try:
-        # Get URL from the request
+        # Get the URL from the request
         data = request.get_json()
         url = data.get('url')
-        
+
         if not url:
             return jsonify({"error": "URL is required"}), 400
-        
-        # Use Requests with headers and session
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        }
-        session = requests.Session()
-        session.headers.update(headers)
-        
-        # Try to fetch content normally
-        response = session.get(url)
-        
-        if response.status_code == 403:  # Forbidden
-            print("403 Forbidden - Using Selenium instead")
-            html_content = fetch_page_with_selenium(url)
-        else:
-            html_content = response.text
-        
-        # Parse HTML content
+
+        # Use Selenium to load JavaScript-rendered pages
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        driver.get(url)
+        html_content = driver.page_source
+        driver.quit()  # Close the driver after fetching the page
+
+        # Parse HTML with BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Initialize result data
+        # Initialize data structure
         result_data = {
             "Candidate Details": {}, 
             "Results": {
@@ -68,7 +50,7 @@ def analyze_exam_result():
                 }
             }
         }
-        
+
         # Extract candidate details
         candidate_table = soup.find('table')
         if candidate_table:
@@ -78,16 +60,16 @@ def analyze_exam_result():
                     key = cells[0].get_text(strip=True)
                     value = cells[1].get_text(strip=True)
                     result_data["Candidate Details"][key] = value
-        
-        # Define exam sections
+
+        # Exam sections
         sections = [
             {"name": "General Intelligence and Reasoning", "range": (1, 25)},
             {"name": "General Awareness", "range": (26, 50)},
             {"name": "Quantitative Aptitude", "range": (51, 75)},
             {"name": "English", "range": (76, 100)}
         ]
-        
-        # Initialize sections
+
+        # Initialize section-wise results
         for section in sections:
             result_data["Results"]["Sections"][section["name"]] = {
                 "Correct": 0,
@@ -95,15 +77,12 @@ def analyze_exam_result():
                 "Attempted": 0,
                 "Marks": 0
             }
-        
-        # Process all questions
+
+        # Process questions
         question_panels = soup.find_all('div', class_='question-pnl')
-        
+
         for i, panel in enumerate(question_panels, 1):
-            current_section = next(
-                (s["name"] for s in sections if s["range"][0] <= i <= s["range"][1]), 
-                None
-            )
+            current_section = next((s["name"] for s in sections if s["range"][0] <= i <= s["range"][1]), None)
             if not current_section:
                 continue
 
@@ -111,23 +90,25 @@ def analyze_exam_result():
             if not status_table:
                 continue
 
-            status = status_table.find('td', text='Status :')
-            if not status:
-                continue
-                
-            status = status.find_next_sibling('td').text.strip()
-            
+            status_td = status_table.find('td', text='Status :')
+            if status_td:
+                status_element = status_td.find_next_sibling('td')
+                status = status_element.text.strip() if status_element else "Unknown"
+            else:
+                status = "Unknown"
+
             if status == 'Answered':
-                chosen_option = status_table.find('td', text='Chosen Option :')
-                if not chosen_option:
+                chosen_option_td = status_table.find('td', text='Chosen Option :')
+                if not chosen_option_td:
                     continue
-                    
-                chosen_option = chosen_option.find_next_sibling('td').text.strip()
+
+                chosen_option_element = chosen_option_td.find_next_sibling('td')
+                chosen_option = chosen_option_element.text.strip() if chosen_option_element else None
+
                 options = panel.find_all('td', class_=['rightAns', 'wrngAns'])
-                
                 for option in options:
                     option_text = option.get_text(strip=True)
-                    if option_text.startswith(f"{chosen_option}."):
+                    if chosen_option and option_text.startswith(f"{chosen_option}."):
                         if 'rightAns' in option.get('class', []):
                             result_data["Results"]["Total"]["Correct"] += 1
                             result_data["Results"]["Sections"][current_section]["Correct"] += 1
